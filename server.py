@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Flask, jsonify
 from flask import request, abort, url_for, send_from_directory
 from flask_pymongo import PyMongo
@@ -70,11 +71,15 @@ def get_robot(filename):
 # Usage: Modify property of one robot
 @app.route('/api/robot/<filename>', methods=['PUT'])
 def put_modify_property(filename):
-    pass
+    update_filter = {'name': filename}
+    json_data = json.loads(request.get_data())
+    info = json_data
+    res = mongo.db.robots.update_one(update_filter, {'$set': info}) 
+    if res:
+        return jsonify({'response_code': 0, 'msg': 'success'})
+    return jsonify({'response_code': 1, 'msg': 'failed'})
 
 
-
-# TODO: file transfer. Currently using file path.
 # POST /api/robot 
 # Usage: Upload a robot file to the collection (updating database)
 @app.route('/uploads/<filename>')

@@ -17,3 +17,8 @@ curl -i http://localhost:5000/api/robot/kawada-hironx/download
 curl -i http://localhost:5000/api/robot/kawada-hironx
 curl -i http://localhost:5000/api/robot/
 ```
+
+## Updating:
+```
+curl -i -H "Content-Type: application/json" -X PUT -d '{"name": "another_robot"}' http://localhost:5000/api/robot/cmu-permma
+```
