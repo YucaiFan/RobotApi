@@ -54,7 +54,7 @@ def parse_robot(filename):
                 for i in range(len(rows)):
                     res_dict[rows[i]] = val[i]
                 res.append(res_dict)
-            return {'name': filename.split('/')[-1][:-4], 'manipulators': res} # res is a list of dicts
+            return {'name': filename.split('/')[-1].split('.')[0], 'manipulators': res} # res is a list of dicts
 
 
             #elif options.doinfo.startswith('sensor'):
@@ -105,6 +105,7 @@ def parse_robot(filename):
         
 
 if __name__ == '__main__':
-    res = parse_robot("../kawada-hironx.zae")
+    #res = parse_robot("../kawada-hironx.zae")
+    res = parse_robot("../data/examples/zange.zae")
     print(res)
     print("="*20)

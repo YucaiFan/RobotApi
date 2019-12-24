@@ -94,8 +94,8 @@ def post_upload_robot():
         print(">> Url: ")
         print(file_url)
 
+        print(">> path:", str(filepath))
         target_data = parse_robot(filepath) 
-
         exist_robot = mongo.db.robots.find_one({'name': target_data['name']})
         if exist_robot:
             return jsonify({'response_code': 1, 'msg': 'failed', 'result': {'name': exist_robot['name'], 'manipulators': exist_robot['manipulators']}})
