@@ -1,5 +1,6 @@
 import os
 import json
+from bson import ObjectId
 from flask import Flask, jsonify
 from flask import request, abort, url_for, send_from_directory
 from flask_pymongo import PyMongo
@@ -9,7 +10,6 @@ from utils.robot_parser import parse_robot
 app = Flask(__name__)
 app.config["MONGO_URI"] = "mongodb://N0e1:N0e1970126@ds351455.mlab.com:51455/colladarobots"
 app.config["UPLOAD_FOLDER"] = "/RobotApi/data/uploads"
-app.config["DOWNLOAD_FOLDER"] = "/downloads"
 mongo = PyMongo(app, retryWrites=False)
 
 @app.route('/testupload', methods=['POST'])
@@ -56,29 +56,48 @@ def get_robots_list():
 
 # GET /api/robot/filename
 # Usage: List one of the robots in the collection
-@app.route('/api/robot/<filename>', methods=['GET'])
-def get_robot(filename):
-    robot = mongo.db.robots.find_one({'name': filename})
+@app.route('/api/robot/<robotname>', methods=['GET'])
+def get_robot(robotname):
+    robot = mongo.db.robots.find_one({'name': robotname})
     if robot:
         output = {'name': robot['name'], 'manipulators': robot['manipulators']}
-        return jsonify({'response_code': 0, 'result': output})
+        return jsonify({'response_code': 0, 'msg': 'Found', 'result': output})
     else:
         output = "File not found"
-        return jsonify({'response_code': 1, 'result': output})
-
+        return jsonify({'response_code': 1, 'msg': output})
 
 # PUT /api/robot/filename
 # Usage: Modify property of one robot
-@app.route('/api/robot/<filename>', methods=['PUT'])
-def put_modify_property(filename):
-    update_filter = {'name': filename}
-    json_data = json.loads(request.get_data())
-    info = json_data
-    res = mongo.db.robots.update_one(update_filter, {'$set': info}) 
-    if res:
-        return jsonify({'response_code': 0, 'msg': 'success'})
-    return jsonify({'response_code': 1, 'msg': 'failed'})
+@app.route('/api/robot/<robotname>', methods=['PUT'])
+def put_modify_property(robotname):
+    try:
+        update_filter = {'name': robotname}
+        json_data = json.loads(request.get_data())
+        info = json_data
 
+        if mongo.db.robots.find_one({'name': robotname}) is None:
+            return jsonify({'response_code': 3, 'msg': 'robot not found'})
+        
+        if mongo.db.robots.find_one({'name': info['name']}):
+            return jsonify({'response_code': 4, 'msg': 'duplicate name'})
+
+        # todo: make consistent
+        res = mongo.db.robots.update(update_filter, {'$set': info}) 
+        print(res)
+        if res['ok']:
+            if info.has_key('name'):
+                filename = robotname + ".zae"
+                targetname = info['name'] + ".zae"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                targetpath = os.path.join(app.config['UPLOAD_FOLDER'], targetname)
+                if os.path.exists(filepath):
+                    os.rename(filepath, targetpath) 
+                    return jsonify({'response_code': 0, 'msg': 'success'})
+                else:
+                    return jsonify({'response_code': 2, 'msg': 'file not found'})
+        return jsonify({'response_code': 1, 'msg': 'failed'})
+    except Exception as e:
+        return jsonify({'response_code': -1, 'msg': str(e)})
 
 # POST /api/robot 
 # Usage: Upload a robot file to the collection (updating database)
@@ -88,37 +107,40 @@ def uploaded_file(filename):
 
 @app.route('/api/robot', methods=['POST'])
 def post_upload_robot():
-    f = request.files['file']
-    if f and f.filename.split('.')[-1] == 'zae':
-        # todo: check file header
-        filename = secure_filename(f.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        f.save(filepath)
-        file_url = url_for('uploaded_file', filename=filename)
-        print(">> Uploaded:", filename)
-        print(">> Url: ")
-        print(file_url)
+    try:
+        f = request.files['file']
+        if f and f.filename.split('.')[-1] == 'zae':
+            # todo: check file header
+            filename = secure_filename(f.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            f.save(filepath)
+            file_url = url_for('uploaded_file', filename=filename)
+            print(">> Uploaded:", filename)
+            print(">> Url: ")
+            print(file_url)
 
-        print(">> path:", str(filepath))
-        target_data = parse_robot(filepath) 
-        exist_robot = mongo.db.robots.find_one({'name': target_data['name']})
-        if exist_robot:
-            return jsonify({'response_code': 1, 'msg': 'failed', 'result': {'name': exist_robot['name'], 'manipulators': exist_robot['manipulators']}})
-            abort(400)
-        new_id = mongo.db.robots.insert(target_data)
-        print(">> Uploaded:", str(new_id))
-        # new_robot = mongo.db.robots.find_one({'_id': {'\$oid': str(new_id)}})
-        new_robot = mongo.db.robots.find_one({'name': target_data['name']})
-        print(new_robot)
-        return jsonify({'response_code': 0, 'msg':'success', 'url': file_url, 'result': {'name': new_robot['name'], 'manipulators': new_robot['manipulators']}})
-
+            print(">> path:", str(filepath))
+            target_data = parse_robot(filepath) 
+            exist_robot = mongo.db.robots.find_one({'name': target_data['name']})
+            if exist_robot:
+                return jsonify({'response_code': 1, 'msg': 'duplicate name', 'result': {'name': exist_robot['name'], 'manipulators': exist_robot['manipulators']}})
+            new_id = mongo.db.robots.insert(target_data)
+            print(">> Uploaded:", str(new_id))
+            # new_robot = mongo.db.robots.find_one({'_id': {'\$oid': str(new_id)}})
+            new_robot = mongo.db.robots.find_one({'_id': ObjectId(str(new_id))})
+            if new_robot: 
+                return jsonify({'response_code': 0, 'msg':'success', 'url': file_url, 'result': {'name': new_robot['name'], 'manipulators': new_robot['manipulators']}})
+            else:
+                return jsonify({'response_code': 2, 'msg': 'insert failed'})
+        return jsonify({'response_code': 3, 'msg': 'file format'})
+    except Exception as e:
+        return jsonify({'response_code': -1, 'msg': str(e)})
 
 # GET /api/robot/filename/download
 # Usage: Download one robot file
-@app.route('/api/robot/<filename>/download', methods=['GET'])
-def get_download_robot(filename):
-    robotname = filename
-    filename = filename + ".zae"
+@app.route('/api/robot/<robotname>/download', methods=['GET'])
+def get_download_robot(robotname):
+    filename = robotname + ".zae"
     print(">> name: ", robotname)
     robot = mongo.db.robots.find_one({'name': robotname})
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -129,9 +151,9 @@ def get_download_robot(filename):
 
 # DELETE /api/robot/filename
 # Usage: Remove a robot file
-@app.route('/api/robot/<filename>', methods=['DELETE'])
-def delete_remove_robot(filename):
-    robotname = filename.split('.')[0]
+@app.route('/api/robot/<robotname>', methods=['DELETE'])
+def delete_remove_robot(robotname):
+    filename = robotname + ".zae"
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     res = mongo.db.robots.find_one({'name': robotname})
     if res:
@@ -140,8 +162,6 @@ def delete_remove_robot(filename):
             os.remove(filepath)
             return jsonify({'response_code': 0, 'msg': 'success', 'filename': filename})
     return jsonify({'response_code': 1, 'msg': 'failed', 'filename': filename})
-
-
 
 
 if __name__ == '__main__':

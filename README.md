@@ -8,7 +8,7 @@ curl http://localhost:5000/api/robot -F "file=@/collada_robots/cmu-permma.zae" -
 
 ## Deleting Files:
 ```
-curl -v -X DELETE http://localhost:5000/api/robot/kawada-hironx.zae
+curl -v -X DELETE http://localhost:5000/api/robot/kawada-hironx
 ```
 
 ## Geting and Downloading:
