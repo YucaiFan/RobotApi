@@ -8,7 +8,23 @@ from utils.robot_parser import parse_robot
 app = Flask(__name__)
 app.config["MONGO_URI"] = "mongodb://N0e1:N0e1970126@ds351455.mlab.com:51455/colladarobots"
 app.config["UPLOAD_FOLDER"] = "/RobotApi/data/uploads"
+app.config["DOWNLOAD_FOLDER"] = "/downloads"
 mongo = PyMongo(app, retryWrites=False)
+
+@app.route('/testupload', methods=['POST'])
+def upload_file():
+    f = request.files['file']
+    if f and f.filename.split('.')[-1] == 'zae':
+        # todo: check file header
+        filename = secure_filename(f.filename)
+        f.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        file_url = url_for('uploaded_file', filename=filename)
+    print(">> url")
+    print(file_url)
+    if file_url:
+        return jsonify({"response_code": 0, "msg": "success", "url": str(file_url)})
+    else:
+        return jsonify({"response_code": 1, "msg": "failed"})
 
 @app.route('/testparser', methods=['GET'])
 def test_parser():
@@ -65,41 +81,25 @@ def put_modify_property(filename):
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/testupload', methods=['POST'])
-def upload_file():
-    f = request.files['file']
-    if f and f.filename.split('.')[-1] == 'zae':
-        # todo: check file header
-        filename = secure_filename(f.filename)
-        f.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        file_url = url_for('uploaded_file', filename=filename)
-    print(">> url")
-    print(file_url)
-    if file_url:
-        return jsonify({"response_code": 0, "msg": "success", "url": str(file_url)})
-    else:
-        return jsonify({"response_code": 1, "msg": "failed"})
-        
-
 @app.route('/api/robot', methods=['POST'])
 def post_upload_robot():
     f = request.files['file']
     if f and f.filename.split('.')[-1] == 'zae':
         # todo: check file header
         filename = secure_filename(f.filename)
-        f.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        f.save(filepath)
         file_url = url_for('uploaded_file', filename=filename)
         print(">> Uploaded:", filename)
         print(">> Url: ")
         print(file_url)
 
-        target_data = parse_robot(filename) 
+        target_data = parse_robot(filepath) 
 
         exist_robot = mongo.db.robots.find_one({'name': target_data['name']})
         if exist_robot:
             return jsonify({'response_code': 1, 'msg': 'failed', 'result': {'name': exist_robot['name'], 'manipulators': exist_robot['manipulators']}})
             abort(400)
-
         new_id = mongo.db.robots.insert(target_data)
         print(">> Uploaded:", str(new_id))
         # new_robot = mongo.db.robots.find_one({'_id': {'\$oid': str(new_id)}})
@@ -110,31 +110,32 @@ def post_upload_robot():
 
 # GET /api/robot/filename/download
 # Usage: Download one robot file
-@app.route('/api/robot/<filename>/download')
+@app.route('/api/robot/<filename>/download', methods=['GET'])
 def get_download_robot(filename):
-    robot = mongo.db.robots.find_one({'name': filename})
-    if robot:
-        res = mongo.db.robots.delete()
-    if not res:
-        return jsonify({'response_code': 1, 'msg': 'Deleting failed'})
-
+    robotname = filename
+    filename = filename + ".zae"
+    print(">> name: ", robotname)
+    robot = mongo.db.robots.find_one({'name': robotname})
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    print(">> filepath: ", str(filepath))
+    if robot and os.path.exists(filepath):
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+    return jsonify({'response_code': 1, 'msg': 'Downloading failed'})
 
 # DELETE /api/robot/filename
 # Usage: Remove a robot file
 @app.route('/api/robot/<filename>', methods=['DELETE'])
 def delete_remove_robot(filename):
-    robot = mongo.db.robots.find_one({'name': filename})
-    if robot:
-        res = mongo.db.robots.delete()
-    if not res:
-        return jsonify({'response_code': 1, 'msg': 'Deleting failed'})
+    robotname = filename.split('.')[0]
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    res = mongo.db.robots.find_one({'name': robotname})
+    if res:
+        mongo.db.robots.delete_one({'name': robotname})
+        if filename.split('.')[-1] == 'zae' and os.path.exists(filepath):
+            os.remove(filepath)
+            return jsonify({'response_code': 0, 'msg': 'success', 'filename': filename})
+    return jsonify({'response_code': 1, 'msg': 'failed', 'filename': filename})
 
-    robot_file = mongo.db.filecontents.find_one({'name': filename})
-    if robot_file:
-        res = mongo.db.filecontents.delete()
-    if not res:
-        return jsonify({'response_code': 1, 'msg': 'Deleting failed'})
-    return jsonify({'response_code': 0, 'msg': 'Deleting success'})
 
 
 
