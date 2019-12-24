@@ -1,10 +1,11 @@
 from flask import Flask, jsonify
+from flask import request
 from flask_pymongo import PyMongo
 from utils.robot_parser import parse_robot
 
 app = Flask(__name__)
 app.config["MONGO_URI"] = "mongodb://N0e1:N0e1970126@ds351455.mlab.com:51455/colladarobots"
-mongo = PyMongo(app)
+mongo = PyMongo(app, retryWrites=False)
 
 @app.route('/testparser', methods=['GET'])
 def test_parser():
@@ -45,12 +46,33 @@ def put_modify_property():
 
 
 
-
+# TODO: file transfer. Currently using file path.
 # POST /api/robot 
 # Usage: Upload a robot file to the collection (updating database)
-@app.route('/api/robot')
+@app.route('/api/robot', methods=['POST'])
 def post_upload_robot():
-    pass
+    if not request.json or not 'filename' in request.json:
+        print(">> haha")
+        #abort(400)
+    print(">> req:")
+    print(request.json)
+    filename = request.json['filename']
+    
+    print(">> Uploading:", filename)
+    target_data = parse_robot(filename) 
+
+    exist_robot = mongo.db.robots.find_one({'name': target_data['name']})
+    if exist_robot:
+        print(">> ?")
+        return jsonify({'response_code': 1, 'result': {'name': exist_robot['name'], 'manipulators': exist_robot['manipulators']}})
+        #abort(400)
+
+    new_id = mongo.db.robots.insert(target_data)
+    print(">> Uploaded:", str(new_id))
+    # new_robot = mongo.db.robots.find_one({'_id': {'\$oid': str(new_id)}})
+    new_robot = mongo.db.robots.find_one({'name': target_data['name']})
+    print(new_robot)
+    return jsonify({'response_code': 0, 'result': {'name': new_robot['name'], 'manipulators': new_robot['manipulators']}})
 
 # GET /api/robot/filename/download
 # Usage: Download one robot file
