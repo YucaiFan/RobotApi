@@ -1,26 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright (C) 2009-2012 Rosen Diankov (rosen.diankov@gmail.com)
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#     http://www.apache.org/licenses/LICENSE-2.0
-# 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 from __future__ import with_statement # for python 2.5
-__author__ = 'Rosen Diankov'
-__copyright__ = 'Copyright (C) 2009-2010 Rosen Diankov (rosen.diankov@gmail.com)'
-__license__ = 'Apache License, Version 2.0'
 
 import sys
 from optparse import OptionParser
-
-__builtins__.__openravepy_version__ = '0.26'
 
 try:
     import openravepy
@@ -61,17 +44,17 @@ def parse_robot(filename):
             res = []
             for m in robot.GetManipulators():
                 res_dict = {}
-                armindices = [i for i in m.GetArmIndices()]
-                gripperindices = [i for i in m.GetGripperIndices()]
+                armindices = [int(i) for i in m.GetArmIndices()]
+                gripperindices = [int(i) for i in m.GetGripperIndices()]
                 # armindices = ','.join(str(i) for i in m.GetArmIndices())
                 # gripperindices = ','.join(str(i) for i in m.GetGripperIndices())
 
-                rows = ['name','base','end','arm-dof','gripper-dof','arm','gripper']
-                val =  [m.GetName(),m.GetBase().GetName(),m.GetEndEffector().GetName(),str(len(m.GetArmIndices())),str(len(m.GetGripperIndices())),armindices,gripperindices]
+                rows = ['manipulator_name','base','end','armdof','gripperdof','arm','gripper']
+                val =  [str(m.GetName()),str(m.GetBase().GetName()), str(m.GetEndEffector().GetName()),str(len(m.GetArmIndices())),str(len(m.GetGripperIndices())),armindices,gripperindices]
                 for i in range(len(rows)):
                     res_dict[rows[i]] = val[i]
                 res.append(res_dict)
-            return res # res is a list of dicts
+            return {'name': filename.split('/')[-1][:-4], 'manipulators': res} # res is a list of dicts
 
 
             #elif options.doinfo.startswith('sensor'):
@@ -123,7 +106,5 @@ def parse_robot(filename):
 
 if __name__ == '__main__':
     res = parse_robot("../kawada-hironx.zae")
-    for res_dict in res:
-        for i in res_dict.keys():
-            print(i, res_dict[i])
-        print("="*20)
+    print(res)
+    print("="*20)
