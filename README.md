@@ -3,7 +3,7 @@
 ```
 curl http://localhost:5000/testupload -F "file=@/RobotApi/data/examples/kawada-hironx.zae" -v
 curl http://localhost:5000/api/robot -F "file=@/RobotApi/data/examples/kawada-hironx.zae" -v
-curl http://localhost:5000/api/robot -F "file=@/collada_robots/kuka-kr150.zae" -v 
+curl http://localhost:5000/api/robot -F "file=@/collada_robots/cmu-permma.zae" -v 
 ```
 
 ## Deleting Files:
