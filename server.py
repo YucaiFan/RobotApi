@@ -111,7 +111,8 @@ def post_upload_robot():
         f = request.files['file']
         if f and f.filename.split('.')[-1] == 'zae':
             # todo: check file header
-            filename = secure_filename(f.filename)
+            filename = f.filename.split('/')[-1]
+            filename = secure_filename(filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             f.save(filepath)
             file_url = url_for('uploaded_file', filename=filename)
